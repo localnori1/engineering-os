@@ -24,6 +24,15 @@ this product; offer a sensible default with each so "I don't know" is fine.
 | Where are users (one country, worldwide)? | Regions, latency, data residency |
 | Rough monthly budget for hosting and services? | Option filtering; spending is human-owned |
 
+Also ask, in plain words:
+
+- What kind of product is this (software for businesses, consumer app,
+  marketplace, mobile app, online store, internal tool, content site, AI
+  feature)? Load the matching sections of [product types](product-types.md).
+- Who uses it, on what devices, and where (desk, phone on the move, shared
+  tablet, poor connection, connected hardware such as printers or scanners)?
+  Any accessibility needs?
+
 ## 2. Derive and record a scale profile
 
 Translate the answers into targets using
@@ -54,6 +63,18 @@ Check and briefly address each, marking not applicable where true:
 - Separate test and production environments; safe deploy and rollback
 - Abuse: rate limits, spam, file-upload limits
 - The first likely bottleneck and the signal that it is approaching
+- Delivery pipeline: code hosted in the owner's account; automated checks
+  (tests, lint, build, security audit) on every change; a private preview
+  deployment for each change so the owner can try it; production deploys only
+  after owner approval
+- Data traps that apply: time zones and "business day" boundaries that cross
+  midnight, dates and recurring schedules, money stored in whole minor units
+  (cents) with explicit rounding, taxes by location, currencies, languages and
+  formats, names and addresses that do not fit one country's shape
+- Usage conditions: device types and sizes, offline or poor-connection
+  behavior, connected hardware, accessibility
+- The essentials from each matching [product type](product-types.md), marked
+  MVP, later, or not applicable
 
 Then record every account and paid service in `docs/project/SERVICES.md` with
 the owner as account owner, run the [compliance](../../engineering-review/references/compliance.md)

@@ -33,6 +33,9 @@ Derived during initialization from plain-language answers; see `system-design`.
 - Hosting budget: Unknown (human-owned)
 - Design headroom: ~10x expected load
 - First likely bottleneck: Unknown
+- Product type(s): Unknown
+- Devices and usage conditions: Unknown
+- Delivery pipeline (checks, previews, deploy approval): Not set up
 
 ## Sources of truth
 

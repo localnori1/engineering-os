@@ -13,6 +13,7 @@ the human approves; it does not authorize implementation or spending.
 - New project or adopting one: follow
   [project foundation](references/project-foundation.md), then return here only
   for deeper analysis.
+- Product-type essentials: [product types](references/product-types.md).
 - Specific design question, performance problem, or component choice: use the
   workflow below.
 

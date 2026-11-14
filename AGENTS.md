@@ -136,8 +136,8 @@ For meaningful implementation, adapt this loop to risk:
    maintainability as relevant; fix safe issues found.
 7. Update durable knowledge only when it will improve future decisions.
 8. Present for review in two layers. First an owner summary: what changed in
-   product terms, how to see it (screenshots, preview link, or "try this,
-   expect that" steps), risk as safe / needs attention / risky, what was not
+   product terms, how to see it (a preview deployment link when the project has
+   one, otherwise screenshots or "try this, expect that" steps), risk as safe / needs attention / risky, what was not
    verified, and decisions needed. Then the technical diff and evidence.
 
 Use the smallest meaningful verification ladder: formatting, lint, typecheck,
