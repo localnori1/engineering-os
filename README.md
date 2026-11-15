@@ -60,6 +60,8 @@ python3 scripts/eos.py check --strict
 python3 scripts/eos.py adapters
 python3 scripts/eos.py hooks install
 python3 scripts/eos.py update-check /path/to/newer-engineering-os
+python3 scripts/eos.py update /path/to/newer-engineering-os
+python3 scripts/eos.py feedback /path/to/project
 python3 scripts/eval_os.py --results evals/fixtures/reference-results.json
 python3 scripts/eos.py package dist/engineering-os.zip
 ```

@@ -21,8 +21,9 @@ v1.2.0: make the Engineering OS the technical partner for a non-technical produc
 - "Lean, proportional changes" in `AGENTS.md` (no needless new files, rewrites, speculative or bloated code); reviewer treats violations as Medium fix-required findings.
 - Security baseline (`engineering-review/references/security-baseline.md`) applied during build, foundation, review, and release; `eos.py check` also detects Stripe live keys, Google API keys, Slack tokens, and database URLs with passwords.
 - Project foundation now covers product type (`system-design/references/product-types.md`), delivery pipeline (CI, preview deployments, approved deploys), data traps (time zones, money, locale), and usage conditions. All OS wording is domain-neutral.
-- Git initialized on `main` with pre-commit hook; baseline commit `5055db9`. Not pushed to any remote.
-- Eval cases added: `design-for-scale`, `new-project-foundation`, `health-check`, `review-fix-loop`, `small-fix-stays-small`, `security-baseline-in-build` (14 total). Strict check, 19 tests, and reference evals pass; `dist/engineering-os-v1.zip` rebuilt.
+- Git on `main` with pre-commit hook; pushed to private template repo `localnori1/engineering-os`.
+- v1.3.0: AI usage budget rule and `PROJECT.md` field; `os-feedback` lessons plus `eos.py feedback`; `eos.py update` (clean-Git, reviewable, never touches project state); Claude Code Stop-hook review gate (`runtimes/claude/hooks/review_gate.py`, linked via `.claude/settings.json`, fails open).
+- Eval cases added: `design-for-scale`, `new-project-foundation`, `health-check`, `review-fix-loop`, `small-fix-stays-small`, `security-baseline-in-build` (14 total). Strict check, 25 tests, and reference evals pass; `dist/engineering-os-v1.zip` rebuilt.
 
 ## In progress
 

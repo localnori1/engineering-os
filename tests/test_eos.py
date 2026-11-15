@@ -21,6 +21,22 @@ assert EVAL_SPEC.loader is not None
 sys.modules["eval_os"] = eval_os
 EVAL_SPEC.loader.exec_module(eval_os)
 
+GATE_SCRIPT = Path(__file__).resolve().parents[1] / "runtimes/claude/hooks/review_gate.py"
+GATE_SPEC = importlib.util.spec_from_file_location("review_gate", GATE_SCRIPT)
+review_gate = importlib.util.module_from_spec(GATE_SPEC)
+assert GATE_SPEC.loader is not None
+sys.modules["review_gate"] = review_gate
+GATE_SPEC.loader.exec_module(review_gate)
+
+
+def git_commit_all(root):
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "-m", "init"],
+        cwd=root, check=True,
+    )
+
 
 class EngineeringOsTests(unittest.TestCase):
     def test_cli_new_end_to_end(self):
@@ -39,6 +55,7 @@ class EngineeringOsTests(unittest.TestCase):
             self.assertTrue((target / ".claude/skills").exists())
             self.assertTrue((target / "docs/project/SERVICES.md").exists())
             self.assertTrue((target / ".claude/agents/reviewer.md").exists())
+            self.assertTrue((target / ".claude/settings.json").exists())
             self.assertIn("Example", (target / "docs/project/PROJECT.md").read_text())
             self.assertTrue(any("created docs/project" in action for action in actions))
             errors = [f for f in eos.check_repository(target, strict=True) if f.level == "error"]
@@ -133,6 +150,111 @@ class EngineeringOsTests(unittest.TestCase):
                 self.assertTrue(any(label in m for m in messages), label)
             (root / "config.js").write_text("postgres" + "://app:pw123@localhost/dev", encoding="utf-8")
             self.assertEqual([], eos.check_secrets(root))
+
+    def test_review_gate_blocks_unreviewed_code_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "README.md").write_text("x\n", encoding="utf-8")
+            git_commit_all(root)
+            (root / "app.py").write_text("\n".join(f"x{i} = {i}" for i in range(50)), encoding="utf-8")
+            edit = '{"type":"tool_use","name":"Edit","input":{}}\n'
+            transcript = root / "t.jsonl"
+            transcript.write_text(edit, encoding="utf-8")
+            payload = {"transcript_path": str(transcript)}
+            self.assertEqual("block", review_gate.decide(payload, root, 40)["decision"])
+            self.assertIsNone(review_gate.decide({**payload, "stop_hook_active": True}, root, 40))
+            dispatch = '{"type":"tool_use","name":"Agent","input":{"prompt":"Output first line VERDICT: PASS or VERDICT: FIX REQUIRED"}}\n'
+            transcript.write_text(edit + dispatch, encoding="utf-8")
+            self.assertEqual("block", review_gate.decide(payload, root, 40)["decision"])
+            transcript.write_text(edit + '{"content":"VERDICT: PASS"}\n', encoding="utf-8")
+            self.assertIsNone(review_gate.decide(payload, root, 40))
+            snapshot = '{"type":"attachment","tools":[{"name":"Edit"}]}\n'
+            doc_edit = '{"type":"tool_use","name":"Edit","input":{"file_path":"/p/docs/CURRENT.md"}}\n'
+            self_pass = '{"type":"assistant","content":"VERDICT: PASS"}\n'
+            transcript.write_text(edit + '{"content":"VERDICT: PASS"}\n' + snapshot + doc_edit, encoding="utf-8")
+            self.assertIsNone(review_gate.decide(payload, root, 40))
+            transcript.write_text(edit + self_pass, encoding="utf-8")
+            self.assertEqual("block", review_gate.decide(payload, root, 40)["decision"])
+            transcript.write_text(edit, encoding="utf-8")
+            (root / "app.py").unlink()
+            (root / "notes.md").write_text("\n".join("doc" for _ in range(80)), encoding="utf-8")
+            self.assertIsNone(review_gate.decide(payload, root, 40))
+
+    def test_update_applies_os_files_only_on_clean_git(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            candidate = Path(temporary) / "candidate"
+            eos.copy_template(project)
+            eos.initialize(project, "Example", no_git=True)
+            git_commit_all(project)
+            eos.copy_template(candidate)
+            skill = candidate / "skills/operations/SKILL.md"
+            skill.write_text(skill.read_text(encoding="utf-8") + "\nNew rule.\n", encoding="utf-8")
+            (candidate / "docs/project").mkdir(parents=True)
+            (candidate / "docs/project/PROJECT.md").write_text("candidate state", encoding="utf-8")
+            before = (project / "docs/project/PROJECT.md").read_text(encoding="utf-8")
+            lines = eos.apply_update(project, candidate)
+            self.assertIn("UPDATE skills/operations/SKILL.md", lines)
+            self.assertIn("New rule.", (project / "skills/operations/SKILL.md").read_text(encoding="utf-8"))
+            self.assertEqual(before, (project / "docs/project/PROJECT.md").read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(RuntimeError, "Commit or stash"):
+                eos.apply_update(project, candidate)
+
+    def test_update_preserves_project_files_and_refuses_downgrade(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            candidate = Path(temporary) / "candidate"
+            outside = Path(temporary) / "outside"
+            eos.copy_template(project)
+            (project / "README.md").write_text("# My App\n", encoding="utf-8")
+            (project / ".gitignore").write_text("config/secrets.yml\n", encoding="utf-8")
+            (project / "source/README.md").write_text("our sources\n", encoding="utf-8")
+            (project / "templates").rename(outside)
+            (project / "templates").symlink_to(outside, target_is_directory=True)
+            git_commit_all(project)
+            eos.copy_template(candidate)
+            (candidate / "templates/project.md").write_text("changed", encoding="utf-8")
+            lines = eos.apply_update(project, candidate)
+            self.assertEqual("# My App\n", (project / "README.md").read_text(encoding="utf-8"))
+            self.assertEqual("config/secrets.yml\n", (project / ".gitignore").read_text(encoding="utf-8"))
+            self.assertTrue(any(line.startswith("MERGE README.md") for line in lines))
+            self.assertEqual("our sources\n", (project / "source/README.md").read_text(encoding="utf-8"))
+            self.assertNotEqual("changed", (outside / "project.md").read_text(encoding="utf-8"))
+            subprocess.run(["git", "stash", "-u", "-q"], cwd=project, check=True)
+            (candidate / "ENGINEERING_OS_VERSION").write_text("0.1.0\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "older"):
+                eos.apply_update(project, candidate)
+
+    def test_update_fails_closed_without_working_git(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            candidate = Path(temporary) / "candidate"
+            eos.copy_template(project)
+            (project / "AGENTS.md").write_text("custom agents\n", encoding="utf-8")
+            (project / ".git").mkdir()
+            eos.copy_template(candidate)
+            with self.assertRaisesRegex(RuntimeError, "working Git repository"):
+                eos.apply_update(project, candidate)
+            self.assertEqual("custom agents\n", (project / "AGENTS.md").read_text(encoding="utf-8"))
+
+    def test_version_order_treats_prerelease_as_older(self):
+        self.assertLess(eos.version_key("1.3.0-rc.1"), eos.version_key("1.3.0"))
+        self.assertLess(eos.version_key("1.3.0"), eos.version_key("1.10.0"))
+
+    def test_feedback_lists_only_os_feedback_lessons(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            lessons = Path(temporary) / "docs/lessons"
+            lessons.mkdir(parents=True)
+            (lessons / "LESSON-001.md").write_text(
+                "---\nid: LESSON-001\ntitle: Reviewer missed it\ntags: [lesson, os-feedback]\n---\n"
+                "## Proposed OS change\n\nAdd a check.\n\n## Evidence\n\n- x\n", encoding="utf-8")
+            (lessons / "LESSON-002.md").write_text(
+                "---\nid: LESSON-002\ntitle: App bug\ntags: [lesson]\n---\n", encoding="utf-8")
+            output = "\n".join(eos.os_feedback(Path(temporary)))
+            with self.assertRaisesRegex(RuntimeError, "No docs/lessons"):
+                eos.os_feedback(Path(temporary) / "missing")
+            self.assertIn("Add a check.", output)
+            self.assertNotIn("LESSON-002", output)
 
     def test_package_excludes_build_and_git_state(self):
         with tempfile.TemporaryDirectory() as temporary:

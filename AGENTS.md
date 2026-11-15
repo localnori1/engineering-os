@@ -36,6 +36,10 @@ when their descriptions match the work.
 - When a decision is the owner's, give a recommendation and at most two
   alternatives, not an open-ended survey.
 - Before non-trivial work, state its rough size and any new recurring cost.
+- Respect the AI usage budget in `PROJECT.md`. Before work likely to need many
+  planning or review rounds, say so plainly and offer a cheaper path (a smaller
+  slice, or one agent for low-risk parts). Never trade away review on risky
+  work to save cost without the owner's agreement.
 - Accounts, domains, and paid services belong to the owner: they sign up and
   pay; the agent records each in `docs/project/SERVICES.md`. Never leave the
   owner dependent on access only an agent or contractor holds.
@@ -208,6 +212,8 @@ three. Stronger models usually cost more; usage spending remains owner-owned.
 - Load the minimum context needed: this file, current project state, current
   handoff, then only relevant requirements, decisions, lessons, and code.
 - Do not preload all of `docs/`, `source/`, or historical records.
+- When a failure is caused by the OS itself, record it as an `os-feedback`
+  lesson so the OS improves for every project.
 - Keep `docs/handoffs/CURRENT.md` concise and current at a meaningful pause,
   context boundary, agent transfer, or incomplete handoff. Do not log every turn.
 - Persist only confirmed decisions, important provenance, durable conventions,

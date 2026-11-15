@@ -36,6 +36,14 @@ Use templates as starting shapes, not mandatory artifacts. Consolidate duplicate
 facts and delete stale low-value prose. Git history provides audit history; live
 documents should optimize for current truth.
 
+## Improving the OS itself
+
+When a failure traces to the Engineering OS (a rule was missing, unclear,
+ignored, or wrong), record a lesson tagged `os-feedback` with a concrete
+"Proposed OS change". The owner later collects these from the OS repository
+with `python3 scripts/eos.py feedback /path/to/project`; an agent there turns
+approved proposals into OS changes through the normal change loop.
+
 ## Retrieval note
 
 Ensure `PROJECT.md` points to a new record if future agents need to discover it.

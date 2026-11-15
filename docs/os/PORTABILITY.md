@@ -47,6 +47,15 @@ rules stay in `AGENTS.md`. If a repository already has `.claude/agents`, the
 adapter leaves it untouched and reports that the files need manual merging.
 The review-fix loop in `AGENTS.md` runs the same way everywhere; in runtimes
 without subagents, each review round is a fresh session.
+Claude Code also gets an optional review gate: `runtimes/claude/settings.json`
+(exposed at `.claude/settings.json`, skipped if the project already has one)
+runs `runtimes/claude/hooks/review_gate.py` when a turn ends. If 40 or more
+lines of uncommitted non-documentation code changed and no reviewer verdict
+followed the latest code edit (documentation edits do not reset it), it sends
+the agent back to run the reviewer once. It only sees edits made through edit
+tools or the `implementer`, not shell commands. It
+fails open, never blocks twice in a row, and is disabled with
+`EOS_REVIEW_GATE=off` (`EOS_REVIEW_MIN_LINES` adjusts the threshold).
 When a runtime cannot pick models per role, keep the role separation anyway:
 plan, implement, and review in distinct steps with a fresh review context.
 

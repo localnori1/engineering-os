@@ -168,8 +168,10 @@ def create_adapter(
     parent.mkdir(parents=True, exist_ok=True)
     relative_target = os.path.relpath(str(canonical), str(parent))
     try:
-        adapter.symlink_to(relative_target, target_is_directory=True)
+        adapter.symlink_to(relative_target, target_is_directory=canonical.is_dir())
     except OSError as exc:
+        if not required:
+            return f"skipped {adapter.relative_to(root)}: {exc}; copy {canonical_rel} manually"
         if os.name != "nt":
             raise RuntimeError(
                 f"Could not create {adapter}: {exc}. Configure the runtime to use {canonical}."
@@ -190,6 +192,8 @@ def adapters(root: Path) -> List[str]:
     actions = [create_adapter(root, ".agents"), create_adapter(root, ".claude")]
     if (root / "runtimes/claude/agents").is_dir():
         actions.append(create_adapter(root, ".claude", "runtimes/claude/agents", required=False))
+    if (root / "runtimes/claude/settings.json").is_file():
+        actions.append(create_adapter(root, ".claude", "runtimes/claude/settings.json", required=False))
     return actions
 
 
@@ -567,6 +571,106 @@ def status(root: Path) -> List[str]:
     return lines
 
 
+# Directories that contain only OS files, so a file missing from a newer OS is stale.
+PURE_OS_DIRS = ("skills", "templates", "runtimes", "docs/os")
+# Files projects legitimately own; an update reports differences but never copies them.
+PROJECT_SHARED_FILES = {"README.md", ".gitignore", "source/README.md"}
+# OS files a project may have extended; replaced, but flagged for review.
+CUSTOMIZABLE_FILES = {"AGENTS.md", "CLAUDE.md", ".githooks/pre-commit", "runtimes/claude/settings.json"}
+
+
+def version_key(version: str) -> tuple:
+    core, _, prerelease = version.partition("-")
+    parts = core.split(".")
+    if not all(part.isdigit() for part in parts):
+        return (0,)
+    # Semver: a prerelease (1.3.0-rc.1) sorts before its release (1.3.0).
+    return (*(int(part) for part in parts), 0 if prerelease else 1, prerelease)
+
+
+def within_without_symlinks(root: Path, path: Path) -> bool:
+    """True when every existing component from root to path is a real directory/file."""
+    current = root
+    for part in path.relative_to(root).parts:
+        current = current / part
+        if current.is_symlink():
+            return False
+    return True
+
+
+def apply_update(current: Path, candidate: Path, force: bool = False) -> List[str]:
+    """Copy a newer OS's files into a project as a reviewable, revertible Git diff."""
+    if current.resolve() == candidate.resolve():
+        raise RuntimeError("Candidate is the current copy.")
+    if not (candidate / "ENGINEERING_OS_VERSION").is_file() or not (candidate / "AGENTS.md").is_file():
+        raise RuntimeError(f"Not an Engineering OS copy: {candidate}")
+    # Fail closed: without a working Git baseline nothing could be reviewed or undone.
+    toplevel = run(["git", "rev-parse", "--show-toplevel"], current)
+    if toplevel.returncode != 0 or Path(toplevel.stdout.strip()).resolve() != current.resolve():
+        raise RuntimeError("Updates require a working Git repository at the project root so every change can be reviewed and undone.")
+    status_result = run(["git", "status", "--porcelain"], current)
+    if status_result.returncode != 0:
+        raise RuntimeError(f"Could not read Git status: {status_result.stderr.strip()}")
+    if status_result.stdout.strip():
+        raise RuntimeError("Commit or stash current changes first so the update is a clean, reviewable diff.")
+    old, new = os_version(current), os_version(candidate)
+    if version_key(new) < version_key(old) and not force:
+        raise RuntimeError(f"Candidate {new} is older than {old}; pass --force to downgrade.")
+    lines = [f"Updating {old} -> {new}"]
+    shipped = set()
+    for source in os_owned_files(candidate):
+        relative = source.relative_to(candidate).as_posix()
+        shipped.add(relative)
+        destination = current / relative
+        if not within_without_symlinks(current, destination):
+            lines.append(f"SKIP {relative} (symlink in path kept)")
+            continue
+        if destination.exists() and file_digest(destination) == file_digest(source):
+            continue
+        if relative in CUSTOMIZABLE_FILES and destination.exists():
+            lines.append(f"NOTE {relative} replaced; re-apply any project-specific lines from `git diff`")
+        if relative in PROJECT_SHARED_FILES and destination.exists():
+            lines.append(f"MERGE {relative} (project-owned; compare with the new OS copy manually)")
+            continue
+        action = "UPDATE" if destination.exists() else "ADD"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        lines.append(f"{action} {relative}")
+    for path in os_owned_files(current):
+        relative = path.relative_to(current).as_posix()
+        if relative not in shipped and relative.startswith(PURE_OS_DIRS):
+            lines.append(f"STALE {relative} (not in the new OS: removed upstream or your own addition; not deleted)")
+    linked_parents = [name for name in (".agents", ".claude") if (current / name).is_symlink()]
+    if linked_parents:
+        lines.append(f"SKIP adapters ({', '.join(linked_parents)} is a symlink; run `adapters` manually)")
+    else:
+        try:
+            lines.extend(adapters(current))
+        except RuntimeError as exc:
+            lines.append(f"ADAPTERS not refreshed: {exc}")
+    lines.append(f"Review from the project root ({current}): `git diff`, `git status`, `python3 scripts/eos.py check --strict`.")
+    lines.append("To undo from the project root: `git restore .`, then `git clean -n` to list added files and links.")
+    return lines
+
+
+def os_feedback(project: Path) -> List[str]:
+    """List lessons a project flagged as improvements for the Engineering OS itself."""
+    lessons = project / "docs/lessons"
+    if not lessons.is_dir():
+        raise RuntimeError(f"No docs/lessons in {project}; is this an Engineering OS project?")
+    lines: List[str] = []
+    for path in sorted(lessons.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        fields = parse_frontmatter(text)
+        tags = {tag.strip() for tag in fields.get("tags", "").strip("[]").split(",")}
+        if "os-feedback" not in tags:
+            continue
+        lines.append(f"## {fields.get('id', path.stem)}: {fields.get('title', '')} ({path.relative_to(project)})")
+        lines.append(section_body(text, "## Proposed OS change") or "(no proposed change written)")
+        lines.append("")
+    return lines or ["No OS feedback recorded in this project."]
+
+
 def install_hooks(root: Path) -> str:
     if not (root / ".git").is_dir():
         raise RuntimeError("Git is not initialized; refusing to configure hooks.")
@@ -613,6 +717,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("version", help="show the local Engineering OS version")
     update = sub.add_parser("update-check", help="compare with another OS copy; never writes files")
     update.add_argument("candidate", type=Path, help="path to a newer unpacked Engineering OS")
+    apply = sub.add_parser("update", help="apply a newer OS copy as a reviewable Git diff")
+    apply.add_argument("candidate", type=Path, help="path to a newer unpacked Engineering OS")
+    apply.add_argument("--force", action="store_true", help="allow applying an older OS version")
+    feedback = sub.add_parser("feedback", help="list a project's lessons flagged for OS improvement")
+    feedback.add_argument("project", type=Path, help="path to a project that uses the Engineering OS")
     hooks = sub.add_parser("hooks", help="manage optional repository safeguards")
     hooks.add_argument("action", choices=("install",))
     pack = sub.add_parser("package", help="create a clean ZIP without project state/build output")
@@ -645,6 +754,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(os_version(root))
         elif args.command == "update-check":
             for line in compare_os(root, args.candidate.resolve()):
+                print(line)
+        elif args.command == "update":
+            for line in apply_update(root, args.candidate.resolve(), args.force):
+                print(line)
+        elif args.command == "feedback":
+            for line in os_feedback(args.project.resolve()):
                 print(line)
         elif args.command == "hooks":
             print(install_hooks(root))

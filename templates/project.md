@@ -31,6 +31,7 @@ Derived during initialization from plain-language answers; see `system-design`.
 - Tolerable downtime / data loss: Unknown
 - Sensitive data or compliance: Unknown
 - Hosting budget: Unknown (human-owned)
+- AI usage budget: Unknown (human-owned; for example monthly plan or spend limit)
 - Design headroom: ~10x expected load
 - First likely bottleneck: Unknown
 - Product type(s): Unknown
