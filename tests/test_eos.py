@@ -355,6 +355,14 @@ class EngineeringOsTests(unittest.TestCase):
         lines = eval_os.compare(cases, failing_first, reference)
         self.assertIn("with OS FAIL, baseline pass  (passes without the OS", lines[0])
 
+    def test_behavior_eval_reports_wrongly_typed_fields_without_crashing(self):
+        cases = eval_os.load_json(eos.ROOT / "evals/cases.json")
+        reference = eval_os.load_json(eos.ROOT / "evals/fixtures/reference-results.json")
+        for field, value in (("signals", None), ("selected_skills", "x"), ("id", ["a"]), ("signals", [1])):
+            broken = [dict(reference[0], **{field: value})] + reference[1:]
+            failures = eval_os.score(cases, broken)
+            self.assertTrue(any("wrongly typed" in failure for failure in failures))
+
     def test_behavior_eval_rejects_unusable_baselines(self):
         cases = eval_os.load_json(eos.ROOT / "evals/cases.json")
         reference = eval_os.load_json(eos.ROOT / "evals/fixtures/reference-results.json")

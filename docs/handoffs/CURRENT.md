@@ -23,6 +23,7 @@ v1.2.0: make the Engineering OS the technical partner for a non-technical produc
 - Project foundation now covers product type (`system-design/references/product-types.md`), delivery pipeline (CI, preview deployments, approved deploys), data traps (time zones, money, locale), and usage conditions. All OS wording is domain-neutral.
 - Git on `main` with pre-commit hook; pushed to public template repo `localnori1/engineering-os` (history uses the GitHub no-reply email).
 - v1.3.0: AI usage budget rule and `PROJECT.md` field; `os-feedback` lessons plus `eos.py feedback`; `eos.py update` (clean-Git, reviewable, never touches project state); Claude Code Stop-hook review gate (`runtimes/claude/hooks/review_gate.py`, linked via `.claude/settings.json`, fails open).
+- v1.4.0: browser/device support target question at project setup; platform-first UI rule; external guidance tool policy in `AGENTS.md`; legacy-pattern audit (`engineering-review/references/legacy-audit.md`); four more eval cases (18 total) and `eval_os.py --baseline` with-OS vs without-OS comparison; scorer reports wrongly typed result fields instead of crashing. Live baseline runs not yet done.
 - Eval cases added: `design-for-scale`, `new-project-foundation`, `health-check`, `review-fix-loop`, `small-fix-stays-small`, `security-baseline-in-build` (14 total). Strict check, 25 tests, and reference evals pass; `dist/engineering-os-v1.zip` rebuilt.
 
 ## In progress

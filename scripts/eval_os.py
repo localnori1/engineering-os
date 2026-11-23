@@ -75,7 +75,16 @@ def score(cases: Sequence[dict], results: object) -> List[str]:
         if missing:
             failures.append(f"result[{index}] missing fields: {', '.join(sorted(missing))}")
             continue
-        result_id = result.get("id")
+        if not isinstance(result["id"], str) or not all(
+            isinstance(result[field], list) and all(isinstance(item, str) for item in result[field])
+            for field in ("selected_skills", "signals")
+        ):
+            failures.append(
+                f"result[{index}] has a wrongly typed field "
+                "(id must be text; selected_skills and signals must be lists of text)"
+            )
+            continue
+        result_id = result["id"]
         if result_id in indexed:
             failures.append(f"duplicate result id: {result_id}")
         indexed[result_id] = result
