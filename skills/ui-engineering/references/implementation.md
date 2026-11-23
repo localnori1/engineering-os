@@ -11,11 +11,19 @@
 5. Preserve semantics, labels, focus order/visibility/trapping/return, keyboard
    behavior, announcements, contrast, reduced motion, zoom/reflow, localization,
    touch targets, and supported viewport behavior.
-6. Keep business rules and authorization at their authoritative boundaries;
+6. For web UI, use the browser's built-in features (native elements, CSS, and
+   platform APIs) before custom scripts or a new library, within the project's
+   browser support target (default: widely supported features only). Verify
+   support against current references such as MDN or the browser-compat data,
+   not memory. A feature newer than the target needs a graceful fallback; one
+   supported by a single browser or still experimental needs the owner's
+   approval. When touching old code, replace a legacy workaround only if the
+   change is in scope; otherwise note it as debt.
+7. Keep business rules and authorization at their authoritative boundaries;
    client visibility is not permission enforcement.
-7. Test deterministic interaction behavior and critical integrations. Inspect
+8. Test deterministic interaction behavior and critical integrations. Inspect
    the rendered result at representative viewports and interaction states.
-8. Compare the finished result with adjacent product surfaces for drift. Request
+9. Compare the finished result with adjacent product surfaces for drift. Request
    human judgment for consequential aesthetics or product behavior.
 
 Use an available UI-polish capability such as Impeccable when useful. Its output

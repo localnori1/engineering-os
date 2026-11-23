@@ -32,6 +32,13 @@ Also ask, in plain words:
 - Who uses it, on what devices, and where (desk, phone on the move, shared
   tablet, poor connection, connected hardware such as printers or scanners)?
   Any accessibility needs?
+- For anything people open in a web browser: should it work for visitors on
+  older browsers and phones, or is "current, up-to-date browsers" enough? This
+  sets the **support target**. Default: the mainstream browsers (Chrome, Safari,
+  Firefox, Edge) as they were about two and a half years ago, which covers
+  nearly all users. Older support costs build time; newer-only saves it but
+  locks out some visitors. Record the answer in `Scale and quality profile`
+  (and the UI foundation, if one exists).
 
 ## 2. Derive and record a scale profile
 

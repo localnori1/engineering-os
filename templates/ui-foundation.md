@@ -14,6 +14,7 @@ authoritative code, Storybook, design files, and tests; do not duplicate them.
 
 - Primary surfaces:
 - Supported input modes/viewports:
+- Browser/device support target (from the profile in `PROJECT.md`):
 - Accessibility or regulatory constraints:
 
 ## Sources of truth
