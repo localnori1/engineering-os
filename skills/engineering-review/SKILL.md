@@ -17,6 +17,8 @@ Read only the references relevant to the request and risk:
 - [Testing and correctness](references/testing.md)
 - [Release and environment](references/release.md)
 - [Legal, privacy, and compliance](references/compliance.md)
+- [Legacy-pattern audit](references/legacy-audit.md), for adopted or inherited
+  code and "what is outdated" requests
 
 ## Review method
 
