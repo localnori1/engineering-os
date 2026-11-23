@@ -36,6 +36,8 @@ v1.2.0: make the Engineering OS the technical partner for a non-technical produc
 
 ## Important decisions and risks
 
+- CI is pinned to `ubuntu-24.04` because Python 3.9 (the macOS system version the OS supports) has no build on newer Ubuntu images; `ubuntu-latest` broke the job in Nov 2026. The pin is temporary: when GitHub drops 3.9 from 24.04, the same error returns, and the owner must choose between raising the minimum Python version or no longer testing 3.9. Existing projects get the fix via `eos.py update`.
+
 - Owner decision: no mandatory performance check on every feature; scale work is front-loaded at initialization.
 - Agents assume a non-technical owner unless `PROJECT.md` says otherwise.
 - All guidance is unproven against a live agent until acceptance runs happen.

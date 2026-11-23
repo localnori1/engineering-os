@@ -10,7 +10,9 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Pinned: Python 3.9 (the macOS system version the OS supports) has no build
+    # for newer Ubuntu images, so "ubuntu-latest" breaks this job.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
