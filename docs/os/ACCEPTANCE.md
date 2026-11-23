@@ -35,6 +35,30 @@ The checked-in reference result validates the scoring system, not a live agent:
 python3 scripts/eval_os.py --results evals/fixtures/reference-results.json
 ```
 
+## Baseline and uplift
+
+A passing score does not show the OS helped: a capable agent may pass a case
+with no OS at all. To measure the difference, run the same prompts a second
+time in a disposable project that has no `AGENTS.md` or skills, record those
+results the same way, and compare:
+
+```bash
+python3 scripts/eval_os.py --results evals/runs/with-os.json --baseline evals/runs/without-os.json
+```
+
+The comparison scores behavior only (disposition, repository mutation,
+approval, signals) and ignores skill selection, since a project without the OS
+has no skills to select. It reports each case with and without the OS and the
+uplift. An empty, partial, unfilled, duplicated, or malformed results or
+baseline file is rejected with an error instead of reported as uplift, and each
+baseline result needs recorded evidence. A case that passes without the OS is
+flagged: it does not test the OS, so tighten its
+required signals or retire it. Write prompts in the owner's words and never
+name the skill, rule, or signal being tested. Compare a baseline and a run only
+from the same runtime, model, and day. One run of each is a spot check, not a
+benchmark; repeat before drawing conclusions. Baseline runs cost paid capacity
+like any live run and need the account owner's authorization.
+
 ## Codex and Claude Code matrix
 
 Test each installed runtime in a disposable project created by `eos.py new`:

@@ -105,6 +105,59 @@ def score(cases: Sequence[dict], results: object) -> List[str]:
     return failures
 
 
+def failed_case_ids(cases: Sequence[dict], results: object) -> set:
+    return {failure.split(":", 1)[0] for failure in score(cases, results)} & {
+        case["id"] for case in cases
+    }
+
+
+def structural_problems(cases: Sequence[dict], results: object) -> List[str]:
+    """Problems with the results file itself, as opposed to a case simply failing."""
+    ids = {case["id"] for case in cases}
+    return [
+        failure
+        for failure in score(cases, results)
+        if failure.split(":", 1)[0] not in ids or failure.endswith(": result missing")
+    ]
+
+
+def compare(cases: Sequence[dict], results: object, baseline: object) -> List[str]:
+    """Compare behavior with the OS versus the same prompts without it.
+
+    Skill selection is ignored: a project without the OS has no skills to select,
+    so counting it would turn uplift into "the OS exists".
+    """
+    problems = [f"results: {item}" for item in structural_problems(cases, results)]
+    problems += [f"baseline: {item}" for item in structural_problems(cases, baseline)]
+    if not problems:
+        for label, data in (("results", results), ("baseline", baseline)):
+            unfilled = [
+                str(result["id"])
+                for result in data
+                if not isinstance(result.get("evidence"), str) or not result["evidence"].strip()
+            ]
+            if unfilled:
+                problems.append(f"{label}: no evidence recorded for " + ", ".join(unfilled))
+    if problems:
+        raise RuntimeError("Cannot compare: " + "; ".join(problems))
+    behavior = [dict(c, expected=dict(c["expected"], skills=[])) for c in cases]
+    failed, base_failed = failed_case_ids(behavior, results), failed_case_ids(behavior, baseline)
+    total = len(cases)
+    lines = []
+    for case in cases:
+        case_id = case["id"]
+        note = ""
+        if case_id not in base_failed:
+            note = "  (passes without the OS: does not test it)"
+        lines.append(
+            f"{case_id}: with OS {'FAIL' if case_id in failed else 'pass'}, "
+            f"baseline {'FAIL' if case_id in base_failed else 'pass'}{note}"
+        )
+    with_os, without = total - len(failed), total - len(base_failed)
+    lines.append(f"With OS {with_os}/{total}; baseline {without}/{total}; uplift {with_os - without} case(s)")
+    return lines
+
+
 def skeleton(cases: Sequence[dict]) -> List[dict]:
     return [
         {
@@ -126,7 +179,14 @@ def main(argv=None) -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--results", type=Path, help="structured results to score")
     group.add_argument("--init-results", type=Path, help="write an empty result capture file")
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        help="with --results: results for the same prompts run without the OS, to report uplift",
+    )
     args = parser.parse_args(argv)
+    if args.baseline and not args.results:
+        parser.error("--baseline requires --results")
     try:
         cases = load_json(args.cases)
         errors = validate_cases(cases)
@@ -143,11 +203,15 @@ def main(argv=None) -> int:
             )
             print(f"Created result skeleton: {args.init_results}")
             return 0
-        failures = score(cases, load_json(args.results))
+        results = load_json(args.results)
+        failures = score(cases, results)
         for failure in failures:
             print(f"FAIL: {failure}")
         passed = len(cases) - len({failure.split(":", 1)[0] for failure in failures})
         print(f"Behavior eval: {passed}/{len(cases)} case(s) passed")
+        if args.baseline:
+            for line in compare(cases, results, load_json(args.baseline)):
+                print(line)
         return 1 if failures else 0
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

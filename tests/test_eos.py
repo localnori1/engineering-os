@@ -342,6 +342,43 @@ class EngineeringOsTests(unittest.TestCase):
         self.assertEqual([], eval_os.score(cases, reference))
         self.assertTrue(eval_os.score(cases, []))
 
+    def test_behavior_eval_baseline_comparison_reports_uplift(self):
+        cases = eval_os.load_json(eos.ROOT / "evals/cases.json")
+        reference = eval_os.load_json(eos.ROOT / "evals/fixtures/reference-results.json")
+        total = len(cases)
+        failing = [dict(item, signals=[]) for item in reference]
+        lines = eval_os.compare(cases, reference, failing)
+        self.assertEqual(f"With OS {total}/{total}; baseline 0/{total}; uplift {total} case(s)", lines[-1])
+        lines = eval_os.compare(cases, reference, reference)
+        self.assertTrue(all("does not test it" in line for line in lines[:-1]))
+        failing_first = [dict(reference[0], signals=[])] + reference[1:]
+        lines = eval_os.compare(cases, failing_first, reference)
+        self.assertIn("with OS FAIL, baseline pass  (passes without the OS", lines[0])
+
+    def test_behavior_eval_rejects_unusable_baselines(self):
+        cases = eval_os.load_json(eos.ROOT / "evals/cases.json")
+        reference = eval_os.load_json(eos.ROOT / "evals/fixtures/reference-results.json")
+        unfilled = eval_os.skeleton(cases)
+        junk = reference + ["junk"]
+        duplicate = reference + [reference[0]]
+        partial = [dict(item) for item in unfilled]
+        partial[0] = reference[0]
+        blank = [dict(item, evidence=" ") for item in reference]
+        for baseline in ([], {"x": 1}, unfilled, junk, duplicate, reference[1:], partial, blank):
+            with self.assertRaises(RuntimeError):
+                eval_os.compare(cases, reference, baseline)
+        with self.assertRaises(RuntimeError):
+            eval_os.compare(cases, [], reference)
+        with self.assertRaises(RuntimeError):
+            eval_os.compare(cases, unfilled, reference)
+
+    def test_behavior_eval_comparison_ignores_skill_selection(self):
+        cases = eval_os.load_json(eos.ROOT / "evals/cases.json")
+        reference = eval_os.load_json(eos.ROOT / "evals/fixtures/reference-results.json")
+        no_skills = [dict(item, selected_skills=[]) for item in reference]
+        lines = eval_os.compare(cases, reference, no_skills)
+        self.assertTrue(all("does not test it" in line for line in lines[:-1]))
+
     def test_handoff_requires_complete_structure_and_valid_timestamp(self):
         with tempfile.TemporaryDirectory() as temporary:
             handoff = Path(temporary) / "CURRENT.md"
